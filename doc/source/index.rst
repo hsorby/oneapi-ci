@@ -5,6 +5,8 @@
 Components available for installation
 =====================================
 
+Data collection: |today|
+
 Windows, Web installer
 ======================
 
@@ -64,13 +66,13 @@ Intel\ |r| oneAPI Rendering Toolkit
 Linux, APT
 ==========
 
-.. include:: list_components/linux_yum_dnf.txt
+.. include:: list_components/linux_apt.txt
    :literal:
 
 Linux, YUM/DNF
 ==============
 
-.. include:: list_components/linux_apt.txt
+.. include:: list_components/linux_yum_dnf.txt
    :literal:
 
 MacOS, Web installer

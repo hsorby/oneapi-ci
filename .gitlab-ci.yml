@@ -6,10 +6,10 @@ stages:
   - build
 
 variables:
-  WINDOWS_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/irc_nas/18497/w_BaseKit_p_2022.1.2.154_offline.exe
-  WINDOWS_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/irc_nas/18529/w_HPCKit_p_2022.1.2.116_offline.exe
-  LINUX_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/irc_nas/18487/l_BaseKit_p_2022.1.2.146_offline.sh
-  LINUX_HPCKIT_URL: https://registrationcenter-download.intel.com/akdlm/irc_nas/18479/l_HPCKit_p_2022.1.2.117_offline.sh
+  WINDOWS_BASEKIT_URL: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/c961e083-5685-4f0b-ada5-c6cf16f561dd/w_BaseKit_p_2023.1.0.47256_offline.exe
+  WINDOWS_HPCKIT_URL: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe
+  LINUX_BASEKIT_URL: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/7deeaac4-f605-4bcf-a81b-ea7531577c61/l_BaseKit_p_2023.1.0.46401_offline.sh
+  LINUX_HPCKIT_URL: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/1ff1b38a-8218-4c53-9956-f0b264de35a4/l_HPCKit_p_2023.1.0.46346_offline.sh
   WINDOWS_CPP_COMPONENTS: intel.oneapi.win.cpp-compiler
   WINDOWS_FORTRAN_COMPONENTS: intel.oneapi.win.ifort-compiler
   WINDOWS_DPCPP_COMPONENTS: intel.oneapi.win.dpcpp-compiler
@@ -19,8 +19,11 @@ variables:
   LINUX_CPP_COMPONENTS_WEB: intel.oneapi.lin.dpcpp-cpp-compiler-pro
   LINUX_FORTRAN_COMPONENTS_WEB: intel.oneapi.lin.ifort-compiler
   LINUX_DPCPP_COMPONENTS_WEB: intel.oneapi.lin.dpcpp-cpp-compiler
-  LINUX_APT_DNF_CACHE_NUMBER: 6
-  SAMPLES_TAG: 2022.1.0
+  CACHE_NUMBER: 13
+  SAMPLES_TAG: 2023.1.0
+  COMPILER_VERSION: "2023.1.0"
+  TBB_VERSION: "2021.9.0"
+  VS_VER: 2019_build_tools
 
 .shared_windows_runners:
   tags:
@@ -34,7 +37,7 @@ build_windows_cpp:
   stage: build
   cache:
     key:
-      prefix: install-${WINDOWS_HPCKIT_URL}-${WINDOWS_CPP_COMPONENTS}-compiler
+      prefix: install-${WINDOWS_CPP_COMPONENTS}-compiler-vcvarsall
       files:
         - scripts/cache_exclude_windows.ps1
     paths:
@@ -44,11 +47,12 @@ build_windows_cpp:
         if(Test-Path cache) {
           New-Item -ItemType "directory" -Path "C:\Program Files (x86)\Intel\oneAPI" -Force
           Move-Item -Path cache\compiler -Destination "C:\Program Files (x86)\Intel\oneAPI"
+          Move-Item -Path cache\setvars-vcvarsall.bat -Destination "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat"
         } else {
           scripts/install_windows.bat $WINDOWS_HPCKIT_URL $WINDOWS_CPP_COMPONENTS
         }
   script:
-    - scripts/build_windows.bat c++ 2019_build_tools ${SAMPLES_TAG}
+    - scripts/build_windows.bat c++ ${VS_VER} ${SAMPLES_TAG}
   after_script:  # Moving install directory into 'cache' folder inside build directory
     - |
         if(!(Test-Path cache)) {
@@ -58,6 +62,7 @@ build_windows_cpp:
         # "push-pull" is the default cache policy, so cache folder needs to be setup in every run.
         # consider setting "policy: pull" once the cache is warm.
         Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\compiler" -Destination "cache"
+        Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat" -Destination "cache"
 
   # Delete the following if you don't want to save install logs
   artifacts:
@@ -74,7 +79,7 @@ build_windows_fortran:
   stage: build
   cache:
     key:
-      prefix: install-${WINDOWS_HPCKIT_URL}-${WINDOWS_FORTRAN_COMPONENTS}-compiler
+      prefix: install-${WINDOWS_FORTRAN_COMPONENTS}-compiler-vcvarsall
       files:
         - scripts/cache_exclude_windows.ps1
     paths:
@@ -84,11 +89,12 @@ build_windows_fortran:
         if(Test-Path cache) {
           New-Item -ItemType "directory" -Path "C:\Program Files (x86)\Intel\oneAPI" -Force
           Move-Item -Path cache\compiler -Destination "C:\Program Files (x86)\Intel\oneAPI"
+          Move-Item -Path cache\setvars-vcvarsall.bat -Destination "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat"
         } else {
           scripts/install_windows.bat $WINDOWS_HPCKIT_URL $WINDOWS_FORTRAN_COMPONENTS
         }
   script:
-    - scripts/build_windows.bat fortran 2019_build_tools ${SAMPLES_TAG}
+    - scripts/build_windows.bat fortran ${VS_VER} ${SAMPLES_TAG}
   after_script:
     - |
         if(!(Test-Path cache)) {
@@ -96,6 +102,7 @@ build_windows_fortran:
           New-Item -ItemType "directory" -Path "cache"
         }
         Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\compiler" -Destination "cache"
+        Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat" -Destination "cache"
 
   # Delete the following if you don't want to save install logs
   artifacts:
@@ -112,7 +119,7 @@ build_windows_dpcpp:
   stage: build
   cache:
     key:
-      prefix: install-${WINDOWS_BASEKIT_URL}-${WINDOWS_DPCPP_COMPONENTS}-compiler-tbb-opencl
+      prefix: install-${WINDOWS_DPCPP_COMPONENTS}-compiler-tbb-opencl-vcvarsall
       files:
         - scripts/cache_exclude_windows.ps1
     paths:
@@ -124,11 +131,13 @@ build_windows_dpcpp:
           Move-Item -Path cache\compiler -Destination "C:\Program Files (x86)\Intel\oneAPI"
           Move-Item -Path cache\tbb -Destination "C:\Program Files (x86)\Intel\oneAPI"
           Move-Item -Path cache\OpenCL.dll -Destination "C:\Windows\System32"
+          Move-Item -Path cache\setvars-vcvarsall.bat -Destination "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat"
+          scripts/restore_registry.bat $COMPILER_VERSION $TBB_VERSION
         } else {
           scripts/install_windows.bat $WINDOWS_BASEKIT_URL $WINDOWS_DPCPP_COMPONENTS
         }
   script:
-    - scripts/build_windows.bat dpc++ 2019_build_tools ${SAMPLES_TAG}
+    - scripts/build_windows.bat dpc++ ${VS_VER} ${SAMPLES_TAG}
   after_script:
     - |
         if(!(Test-Path cache)) {
@@ -138,6 +147,8 @@ build_windows_dpcpp:
         Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\compiler" -Destination "cache"
         Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\tbb" -Destination "cache"
         Move-Item -Path "C:\Windows\System32\OpenCL.dll" -Destination "cache"
+        Move-Item -Path "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat" -Destination "cache"
+
   # Delete the following if you don't want to save install logs
   artifacts:
     when: always
@@ -271,7 +282,7 @@ build_linux_apt_cpp:
   stage: build
   cache:
     key: # GitLab CI doesn't support steps before cache is restored, i.e. only static cache keys are supported.
-      prefix: install-${LINUX_APT_DNF_CACHE_NUMBER}-${LINUX_CPP_COMPONENTS}-compiler
+      prefix: install-${CACHE_NUMBER}-${LINUX_CPP_COMPONENTS}-compiler
       files:
         - scripts/cache_exclude_linux_no_sudo.sh
     paths:
@@ -303,7 +314,7 @@ build_linux_apt_fortran:
   stage: build
   cache:
     key:
-      prefix: install-${LINUX_APT_DNF_CACHE_NUMBER}-${LINUX_FORTRAN_COMPONENTS}-compiler
+      prefix: install-${CACHE_NUMBER}-${LINUX_FORTRAN_COMPONENTS}-compiler
       files:
         - scripts/cache_exclude_linux_no_sudo.sh
     paths:
@@ -335,7 +346,7 @@ build_linux_apt_dpcpp:
   stage: build
   cache:
     key:
-      prefix: install-${LINUX_APT_DNF_CACHE_NUMBER}-${LINUX_DPCPP_COMPONENTS}-compiler-tbb
+      prefix: install-${CACHE_NUMBER}-${LINUX_DPCPP_COMPONENTS}-compiler-tbb
       files:
         - scripts/cache_exclude_linux_no_sudo.sh
     paths:
@@ -369,7 +380,7 @@ build_linux_dnf_cpp:
   stage: build
   cache:
     key: # GitLab CI doesn't support steps before cache is restored, i.e. only static cache keys are supported.
-      prefix: install-${LINUX_APT_DNF_CACHE_NUMBER}-${LINUX_CPP_COMPONENTS}-compiler
+      prefix: install-${CACHE_NUMBER}-${LINUX_CPP_COMPONENTS}-compiler
       files:
         - scripts/cache_exclude_linux_no_sudo.sh
     paths:
@@ -401,7 +412,7 @@ build_linux_dnf_fortran:
   stage: build
   cache:
     key:
-      prefix: install-${LINUX_APT_DNF_CACHE_NUMBER}-${LINUX_FORTRAN_COMPONENTS}-compiler
+      prefix: install-${CACHE_NUMBER}-${LINUX_FORTRAN_COMPONENTS}-compiler
       files:
         - scripts/cache_exclude_linux_no_sudo.sh
     paths:
@@ -433,7 +444,7 @@ build_linux_dnf_dpcpp:
   stage: build
   cache:
     key:
-      prefix: install-${LINUX_APT_DNF_CACHE_NUMBER}-${LINUX_DPCPP_COMPONENTS}-compiler-tbb
+      prefix: install-${CACHE_NUMBER}-${LINUX_DPCPP_COMPONENTS}-compiler-tbb
       files:
         - scripts/cache_exclude_linux_no_sudo.sh
     paths:

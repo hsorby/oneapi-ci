@@ -7,15 +7,15 @@ trigger:
 
 variables:
   - name: WINDOWS_BASEKIT_URL
-    value: https://registrationcenter-download.intel.com/akdlm/irc_nas/18497/w_BaseKit_p_2022.1.2.154_offline.exe
+    value: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/c961e083-5685-4f0b-ada5-c6cf16f561dd/w_BaseKit_p_2023.1.0.47256_offline.exe
   - name: WINDOWS_HPCKIT_URL
-    value: https://registrationcenter-download.intel.com/akdlm/irc_nas/18529/w_HPCKit_p_2022.1.2.116_offline.exe
+    value: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/2a13d966-fcc5-4a66-9fcc-50603820e0c9/w_HPCKit_p_2023.1.0.46357_offline.exe
   - name: LINUX_BASEKIT_URL
-    value: https://registrationcenter-download.intel.com/akdlm/irc_nas/18487/l_BaseKit_p_2022.1.2.146_offline.sh
+    value: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/7deeaac4-f605-4bcf-a81b-ea7531577c61/l_BaseKit_p_2023.1.0.46401_offline.sh
   - name: LINUX_HPCKIT_URL
-    value: https://registrationcenter-download.intel.com/akdlm/irc_nas/18479/l_HPCKit_p_2022.1.2.117_offline.sh
+    value: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/1ff1b38a-8218-4c53-9956-f0b264de35a4/l_HPCKit_p_2023.1.0.46346_offline.sh
   - name: MACOS_HPCKIT_URL
-    value: https://registrationcenter-download.intel.com/akdlm/irc_nas/18341/m_HPCKit_p_2022.1.0.86_offline.dmg
+    value: https:/registrationcenter-download.intel.com/akdlm/IRC_NAS/a99cb1c5-5af6-4824-9811-ae172d24e594/m_HPCKit_p_2023.1.0.44543_offline.dmg
   - name: WINDOWS_CPP_COMPONENTS
     value: intel.oneapi.win.cpp-compiler
   - name: WINDOWS_FORTRAN_COMPONENTS
@@ -39,7 +39,13 @@ variables:
   - name: MACOS_FORTRAN_COMPONENTS
     value: intel.oneapi.mac.ifort-compiler
   - name: SAMPLES_TAG
-    value: 2022.1.0
+    value: 2023.1.0
+  - name: COMPILER_VERSION
+    value: 2023.1.0
+  - name: TBB_VERSION
+    value: 2021.9.0
+  - name: VS_VER
+    value: vs2022
 
 resources:
     containers:
@@ -55,18 +61,32 @@ jobs:
   pool:
     vmImage: 'windows-latest'
   steps:
+  - task: Cache@2 # multiple paths per cache not supported yet. See https://github.com/microsoft/azure-pipelines-agent/pull/2834
+    inputs:
+      path: vcvarsall
+      key: '"install" | "$(WINDOWS_HPCKIT_URL)" | "$(WINDOWS_CPP_COMPONENTS)" | "vcvarsall" | scripts/cache_exclude_windows.sh'
+      cacheHitVar: CACHE_RESTORED
   - task: Cache@2
+    condition: eq(variables.CACHE_RESTORED, 'true')
     inputs:
       path: C:\Program Files (x86)\Intel\oneAPI\compiler
-      key: '"install" | "$(WINDOWS_HPCKIT_URL)" | "$(WINDOWS_CPP_COMPONENTS)" | compiler | scripts/cache_exclude_windows.sh'
+      key: '"install" | "$(WINDOWS_HPCKIT_URL)" | "$(WINDOWS_CPP_COMPONENTS)" | "compiler" | scripts/cache_exclude_windows.sh'
       cacheHitVar: CACHE_RESTORED
   - script: scripts/install_windows.bat $(WINDOWS_HPCKIT_URL) $(WINDOWS_CPP_COMPONENTS)
     displayName: install
     condition: ne(variables.CACHE_RESTORED, 'true')
-  - script: scripts/build_windows.bat c++ "" $(SAMPLES_TAG)
+  - bash: cp vcvarsall/setvars-vcvarsall.bat "C:/Program Files (x86)/Intel/oneAPI/"
+    displayName: restore setvars-vcvarsall.bat from cache
+    condition: eq(variables.CACHE_RESTORED, 'true')
+  - script: scripts/build_windows.bat c++ $(VS_VER) $(SAMPLES_TAG)
     displayName: build
   - bash: scripts/cache_exclude_windows.sh
     displayName: exclude unused files from cache
+    condition: ne(variables.CACHE_RESTORED, 'true')
+  - bash: |
+      mkdir -p vcvarsall
+      cp "C:/Program Files (x86)/Intel/oneAPI/setvars-vcvarsall.bat" vcvarsall/
+    displayName: copy setvars-vcvarsall.bat to a folder for caching
     condition: ne(variables.CACHE_RESTORED, 'true')
 
   # Delete the following if you don't want to save install logs
@@ -89,7 +109,13 @@ jobs:
   pool:
     vmImage: 'windows-latest'
   steps:
+  - task: Cache@2 # multiple paths per cache not supported yet. See https://github.com/microsoft/azure-pipelines-agent/pull/2834
+    inputs:
+      path: vcvarsall
+      key: '"install" | "$(WINDOWS_HPCKIT_URL)" | "$(WINDOWS_FORTRAN_COMPONENTS)" | "vcvarsall" | scripts/cache_exclude_windows.sh'
+      cacheHitVar: CACHE_RESTORED
   - task: Cache@2
+    condition: eq(variables.CACHE_RESTORED, 'true')
     inputs:
       path: C:\Program Files (x86)\Intel\oneAPI\compiler
       key: '"install" | "$(WINDOWS_HPCKIT_URL)" | "$(WINDOWS_FORTRAN_COMPONENTS)" | "compiler" | scripts/cache_exclude_windows.sh'
@@ -97,10 +123,18 @@ jobs:
   - script: scripts/install_windows.bat $(WINDOWS_HPCKIT_URL) $(WINDOWS_FORTRAN_COMPONENTS)
     displayName: install
     condition: ne(variables.CACHE_RESTORED, 'true')
-  - script: scripts/build_windows.bat fortran "" $(SAMPLES_TAG)
+  - bash: cp vcvarsall/setvars-vcvarsall.bat "C:/Program Files (x86)/Intel/oneAPI/"
+    displayName: restore setvars-vcvarsall.bat from cache
+    condition: eq(variables.CACHE_RESTORED, 'true')
+  - script: scripts/build_windows.bat fortran $(VS_VER) $(SAMPLES_TAG)
     displayName: build
   - bash: scripts/cache_exclude_windows.sh
     displayName: exclude unused files from cache
+    condition: ne(variables.CACHE_RESTORED, 'true')
+  - bash: |
+      mkdir -p vcvarsall
+      cp "C:/Program Files (x86)/Intel/oneAPI/setvars-vcvarsall.bat" vcvarsall/
+    displayName: copy setvars-vcvarsall.bat to a folder for caching
     condition: ne(variables.CACHE_RESTORED, 'true')
 
   # Delete the following if you don't want to save install logs
@@ -123,39 +157,56 @@ jobs:
   pool:
     vmImage: 'windows-latest'
   steps:
-#  - task: Cache@2 # multiple paths per cache not supported yet. See https://github.com/microsoft/azure-pipelines-agent/pull/2834
-#    inputs:
-#      path: C:\Program Files (x86)\Intel\oneAPI\compiler
-#      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "compiler" | scripts/cache_exclude_windows.sh'
-#      cacheHitVar: CACHE_RESTORED
-#  - task: Cache@2
-#    condition: eq(variables.CACHE_RESTORED, 'true')
-#    inputs:
-#      path: C:\Program Files (x86)\Intel\oneAPI\tbb
-#      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "tbb" | scripts/cache_exclude_windows.sh'
-#      cacheHitVar: CACHE_RESTORED
-#  - task: Cache@2
-#    condition: eq(variables.CACHE_RESTORED, 'true')
-#    inputs:
-#      path: opencl # caching of individual files is not supported, caching OpenCL.dll in a folder as a workaround.
-#      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "opencl_folder" | scripts/cache_exclude_windows.sh'
-#      cacheHitVar: CACHE_RESTORED
+  - task: Cache@2 # multiple paths per cache not supported yet. See https://github.com/microsoft/azure-pipelines-agent/pull/2834
+    inputs:
+      path: vcvarsall
+      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "vcvarsall" | scripts/cache_exclude_windows.sh'
+      cacheHitVar: CACHE_RESTORED
+  - task: Cache@2
+    condition: eq(variables.CACHE_RESTORED, 'true')
+    inputs:
+      path: C:\Program Files (x86)\Intel\oneAPI\compiler
+      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "compiler" | scripts/cache_exclude_windows.sh'
+      cacheHitVar: CACHE_RESTORED
+  - task: Cache@2
+    condition: eq(variables.CACHE_RESTORED, 'true')
+    inputs:
+      path: C:\Program Files (x86)\Intel\oneAPI\tbb
+      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "tbb" | scripts/cache_exclude_windows.sh'
+      cacheHitVar: CACHE_RESTORED
+  - task: Cache@2
+    condition: eq(variables.CACHE_RESTORED, 'true')
+    inputs:
+      path: opencl # caching of individual files is not supported, caching OpenCL.dll in a folder as a workaround.
+      key: '"install" | "$(WINDOWS_BASEKIT_URL)" | "$(WINDOWS_DPCPP_COMPONENTS)" | "opencl_folder" | scripts/cache_exclude_windows.sh'
+      cacheHitVar: CACHE_RESTORED
   - script: scripts/install_windows.bat $(WINDOWS_BASEKIT_URL) $(WINDOWS_DPCPP_COMPONENTS)
     displayName: install
     condition: ne(variables.CACHE_RESTORED, 'true')
+  - script: scripts/restore_registry.bat $(COMPILER_VERSION) $(TBB_VERSION)
+    displayName: restory registry on cache hit
+    condition: eq(variables.CACHE_RESTORED, 'true')
+  - bash: cp vcvarsall/setvars-vcvarsall.bat "C:/Program Files (x86)/Intel/oneAPI/"
+    displayName: restore setvars-vcvarsall.bat from cache
+    condition: eq(variables.CACHE_RESTORED, 'true')
   - bash: cp opencl/OpenCL.dll C:/Windows/System32/
     displayName: restore OpenCL.dll from cache
     condition: eq(variables.CACHE_RESTORED, 'true')
-  - script: scripts/build_windows.bat dpc++ "" $(SAMPLES_TAG)
+  - script: scripts/build_windows.bat dpc++ $(VS_VER) $(SAMPLES_TAG)
     displayName: build
-#  - bash: scripts/cache_exclude_windows.sh
-#    displayName: exclude unused files from cache
-#    condition: ne(variables.CACHE_RESTORED, 'true')
-#  - bash: |
-#      mkdir -p opencl
-#      cp C:/Windows/System32/OpenCL.dll opencl/
-#    displayName: copy OpenCL.dll to a folder for caching
-#    condition: ne(variables.CACHE_RESTORED, 'true')
+  - bash: scripts/cache_exclude_windows.sh
+    displayName: exclude unused files from cache
+    condition: ne(variables.CACHE_RESTORED, 'true')
+  - bash: |
+      mkdir -p vcvarsall
+      cp "C:/Program Files (x86)/Intel/oneAPI/setvars-vcvarsall.bat" vcvarsall/
+    displayName: copy setvars-vcvarsall.bat to a folder for caching
+    condition: ne(variables.CACHE_RESTORED, 'true')
+  - bash: |
+      mkdir -p opencl
+      cp C:/Windows/System32/OpenCL.dll opencl/
+    displayName: copy OpenCL.dll to a folder for caching
+    condition: ne(variables.CACHE_RESTORED, 'true')
 
   # Delete the following if you don't want to save install logs
   - task: CopyFiles@2

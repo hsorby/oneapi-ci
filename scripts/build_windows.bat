@@ -1,4 +1,4 @@
-REM SPDX-FileCopyrightText: 2020 Intel Corporation
+REM SPDX-FileCopyrightText: 2022 Intel Corporation
 REM
 REM SPDX-License-Identifier: MIT
 
@@ -7,12 +7,15 @@ set VS_VER=%2
 set SAMPLES_TAG=%3
 
 IF "%VS_VER%"=="2017_build_tools" (
-@call "C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+    @call "C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+) ELSE (
+    IF "%VS_VER%"=="2019_build_tools" (
+        @call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+    ) ELSE (
+          @call "C:\Program Files (x86)\Intel\oneAPI\setvars-vcvarsall.bat" %VS_VER%
+    )
 )
 
-IF "%VS_VER%"=="2019_build_tools" (
-@call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-)
 for /f "tokens=* usebackq" %%f in (`dir /b "C:\Program Files (x86)\Intel\oneAPI\compiler\" ^| findstr /V latest ^| sort`) do @set "LATEST_VERSION=%%f"
 @call "C:\Program Files (x86)\Intel\oneAPI\compiler\%LATEST_VERSION%\env\vars.bat"
 
@@ -51,9 +54,12 @@ goto exit
 :dpcpp
 for /f "tokens=* usebackq" %%f in (`dir /b "C:\Program Files (x86)\Intel\oneAPI\tbb\" ^| findstr /V latest ^| sort`) do @set "LATEST_VERSION=%%f"
 @call "C:\Program Files (x86)\Intel\oneAPI\tbb\%LATEST_VERSION%\env\vars.bat"
-cd oneAPI-samples\DirectProgramming\DPC++\DenseLinearAlgebra\vector-add
-nmake -f Makefile.win
-nmake -f Makefile.win run
+cd oneAPI-samples\DirectProgramming\C++SYCL\DenseLinearAlgebra\vector-add
+mkdir build
+cd build
+cmake -G "NMake Makefiles" ..
+nmake cpu-gpu
+vector-add-buffers
 set RESULT=%ERRORLEVEL%
 goto exit
 
